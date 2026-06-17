@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
@@ -5,6 +6,7 @@ import {
   FolderSearch,
   FileJson,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { Button } from "@/components/ui/Button";
@@ -15,8 +17,8 @@ import { buildManifest, downloadManifest } from "@/lib/manifest";
 export function ArchiveSuccess() {
   const navigate = useNavigate();
   const result = useStore((s) => s.lastArchiveResult);
-  const cases = useStore((s) => s.cases);
   const clearArchiveResult = useStore((s) => s.clearArchiveResult);
+  const cases = useStore((s) => s.cases);
   const assets = useStore((s) => s.assets);
   const consumables = useStore((s) => s.consumables);
   const contrast = useStore((s) => s.contrast);
@@ -24,27 +26,54 @@ export function ArchiveSuccess() {
   const verification = useStore((s) => s.verification);
   const selectedCaseId = useStore((s) => s.selectedCaseId);
   const getSurgeon = useStore((s) => s.getSurgeon);
-  const computeValidation = useStore((s) => s.computeValidation);
+  const getCaseById = useStore((s) => s.getCaseById);
+  const fetchArchivedAssets = useStore((s) => s.fetchArchivedAssets);
+
+  const [downloading, setDownloading] = useState<"json" | "text" | null>(null);
 
   if (!result) return null;
-  const validation = computeValidation();
-  const caseData = cases.find((c) => c.caseId === selectedCaseId);
-  const caseCount = cases.filter((c) => !c.archived).length;
-  const surgeon = caseData ? getSurgeon(caseData.surgeonId) : undefined;
 
-  const handleDownload = (format: "json" | "text") => {
-    if (!result || !caseData) return;
-    const manifest = buildManifest({
-      record: result,
-      caseData,
-      assets,
-      consumables,
-      contrast,
-      remarks,
-      verification,
-      surgeon,
-    });
-    downloadManifest(manifest, format);
+  const surgeon = getSurgeon(result.surgeonId);
+  const activeCasesCount = cases.filter((c) => !c.archived).length;
+
+  const handleDownload = async (format: "json" | "text") => {
+    if (!result) return;
+    setDownloading(format);
+    try {
+      let caseData = cases.find((c) => c.caseId === result.caseId);
+      if (!caseData) {
+        caseData = await getCaseById(result.caseId);
+      }
+      let resolvedAssets = assets;
+      let resolvedConsumables = consumables;
+      let resolvedContrast = contrast;
+      let resolvedRemarks = remarks;
+      let resolvedVerification = verification;
+
+      if (!caseData) return;
+
+      if (selectedCaseId !== caseData.caseId || resolvedAssets.length === 0) {
+        resolvedAssets = await fetchArchivedAssets(caseData.caseId);
+        resolvedConsumables = result.snapshot.consumables;
+        resolvedContrast = result.snapshot.contrast;
+        resolvedRemarks = result.snapshot.remarks;
+        resolvedVerification = result.snapshot.verification;
+      }
+
+      const manifest = buildManifest({
+        record: result,
+        caseData,
+        assets: resolvedAssets,
+        consumables: resolvedConsumables,
+        contrast: resolvedContrast,
+        remarks: resolvedRemarks,
+        verification: resolvedVerification,
+        surgeon,
+      });
+      downloadManifest(manifest, format);
+    } finally {
+      setDownloading(null);
+    }
   };
 
   return (
@@ -73,13 +102,13 @@ export function ArchiveSuccess() {
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xs border border-line-soft bg-ink-850 p-2.5">
               <div className="tnum text-lg font-semibold text-chalk">
-                {assets.length}
+                {result.assetCount}
               </div>
               <div className="font-mono text-[10px] text-chalk-mute">影像项</div>
             </div>
             <div className="rounded-xs border border-line-soft bg-ink-850 p-2.5">
               <div className="tnum text-lg font-semibold text-chalk">
-                {validation.stageCoverage}
+                {result.stageCoverage}
               </div>
               <div className="font-mono text-[10px] text-chalk-mute">阶段</div>
             </div>
@@ -99,16 +128,30 @@ export function ArchiveSuccess() {
               <Button
                 variant="secondary"
                 size="sm"
-                icon={<FileText className="h-3.5 w-3.5" />}
+                icon={
+                  downloading === "text" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5" />
+                  )
+                }
                 onClick={() => handleDownload("text")}
+                disabled={downloading !== null}
               >
                 下载 TXT
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
-                icon={<FileJson className="h-3.5 w-3.5" />}
+                icon={
+                  downloading === "json" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileJson className="h-3.5 w-3.5" />
+                  )
+                }
                 onClick={() => handleDownload("json")}
+                disabled={downloading !== null}
               >
                 下载 JSON
               </Button>
@@ -120,7 +163,7 @@ export function ArchiveSuccess() {
 
           <div className="mt-3 flex items-center justify-center gap-1.5 font-mono text-[10px] text-chalk-mute">
             <FileCheck2 className="h-3 w-3" />
-            归档时间 {formatDateTime(new Date().toISOString())}
+            归档时间 {formatDateTime(result.archivedAt)}
           </div>
         </div>
 
@@ -141,7 +184,7 @@ export function ArchiveSuccess() {
             归档下一例
           </Button>
         </div>
-        {caseCount === 0 && (
+        {activeCasesCount === 0 && (
           <div className="px-4 pb-4 text-center font-mono text-[10px] text-chalk-mute">
             当日全部病例已归档完成
           </div>

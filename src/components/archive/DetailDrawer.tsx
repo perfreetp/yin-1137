@@ -12,6 +12,7 @@ import {
   SearchX,
   X,
   ArrowLeft,
+  Loader2,
 } from "lucide-react";
 import type { ArchiveRecord, Asset } from "@/types";
 import { AssetThumb } from "@/components/AssetThumb";
@@ -60,9 +61,10 @@ export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("overview");
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState<"json" | "text" | null>(null);
   const cases = useStore((s) => s.cases);
   const getSurgeon = useStore((s) => s.getSurgeon);
-  const caseData = cases.find((c) => c.caseId === record.caseId);
+  const getCaseById = useStore((s) => s.getCaseById);
   const surgeon = getSurgeon(record.surgeonId);
   const snap = record.snapshot;
   const covered = new Set(record.stagesCovered);
@@ -74,32 +76,42 @@ export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
     });
   };
 
-  const handleDownloadManifest = (format: "json" | "text") => {
-    if (!caseData) return;
-    const manifest = buildManifest({
-      record,
-      caseData,
-      assets,
-      consumables: snap.consumables,
-      contrast: snap.contrast,
-      remarks: snap.remarks,
-      verification: snap.verification,
-      surgeon,
-    });
-    downloadManifest(manifest, format);
+  const handleDownloadManifest = async (format: "json" | "text") => {
+    setDownloading(format);
+    try {
+      let caseData = cases.find((c) => c.caseId === record.caseId);
+      if (!caseData) {
+        caseData = await getCaseById(record.caseId);
+      }
+      if (!caseData) return;
+      const manifest = buildManifest({
+        record,
+        caseData,
+        assets,
+        consumables: snap.consumables,
+        contrast: snap.contrast,
+        remarks: snap.remarks,
+        verification: snap.verification,
+        surgeon,
+      });
+      downloadManifest(manifest, format);
+    } finally {
+      setDownloading(null);
+    }
   };
 
-  const handleJumpToEdit = () => {
-    const target = cases.find((c) => c.caseId === record.caseId);
+  const handleJumpToEdit = async () => {
+    let target = cases.find((c) => c.caseId === record.caseId);
+    if (!target) {
+      target = await getCaseById(record.caseId);
+    }
     if (target) {
       navigate("/collect");
-      setTimeout(() => {
-        useStore.getState().selectRoom(target.roomId);
-        useStore.getState().selectDevice(target.deviceType);
-        useStore.getState().selectCase(target.caseId);
-      }, 50);
-    } else {
-      navigate("/collect");
+      const state = useStore.getState();
+      state.clearArchiveResult();
+      state.selectRoom(target.roomId);
+      state.selectDevice(target.deviceType);
+      state.selectCase(target.caseId);
     }
     onClose();
   };
@@ -161,16 +173,26 @@ export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
           <div className="ml-auto flex gap-1.5">
             <button
               onClick={() => handleDownloadManifest("text")}
-              className="flex items-center gap-1 rounded-xs border border-line-soft bg-ink-800 px-2 py-1 text-[10px] text-chalk-dim transition-colors hover:bg-ink-700 hover:text-chalk"
+              disabled={downloading !== null}
+              className="flex items-center gap-1 rounded-xs border border-line-soft bg-ink-800 px-2 py-1 text-[10px] text-chalk-dim transition-colors hover:bg-ink-700 hover:text-chalk disabled:opacity-50"
             >
-              <FileText className="h-3 w-3" />
+              {downloading === "text" ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <FileText className="h-3 w-3" />
+              )}
               TXT
             </button>
             <button
               onClick={() => handleDownloadManifest("json")}
-              className="flex items-center gap-1 rounded-xs border border-line-soft bg-ink-800 px-2 py-1 text-[10px] text-chalk-dim transition-colors hover:bg-ink-700 hover:text-chalk"
+              disabled={downloading !== null}
+              className="flex items-center gap-1 rounded-xs border border-line-soft bg-ink-800 px-2 py-1 text-[10px] text-chalk-dim transition-colors hover:bg-ink-700 hover:text-chalk disabled:opacity-50"
             >
-              <FileJson className="h-3 w-3" />
+              {downloading === "json" ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <FileJson className="h-3 w-3" />
+              )}
               JSON
             </button>
           </div>

@@ -2,6 +2,7 @@ import { useStore } from "@/store/useStore";
 import { fromDateTimeLocal, toDateTimeLocal } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Case } from "@/types";
+import { FileCheck } from "lucide-react";
 
 const FIELDS: {
   key: keyof Case;
@@ -28,6 +29,15 @@ export function PatientCard() {
 
   return (
     <section className="rounded-md border border-line-soft bg-ink-875/60">
+      {caseData.archived && (
+        <div className="flex items-center gap-2 border-b border-sterile/30 bg-sterile/5 px-4 py-2 text-[11px] text-sterile">
+          <FileCheck className="h-3.5 w-3.5" />
+          <span className="font-medium">归档病例补录模式</span>
+          <span className="font-mono text-sterile/70">
+            补录完成后将生成新的归档追溯记录
+          </span>
+        </div>
+      )}
       <div className="flex items-center justify-between border-b border-line-soft px-4 py-2.5">
         <div className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-teal" />

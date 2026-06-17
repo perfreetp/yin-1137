@@ -35,7 +35,7 @@ export function Sidebar() {
   const resetAll = useStore((s) => s.resetAll);
   const ready = useStore((s) => s.ready);
   const archiveCount = useStore((s) => s.archiveRecords.length);
-  const activeCount = useStore((s) => s.cases.length);
+  const activeCount = useStore((s) => s.cases.filter((c) => !c.archived).length);
 
   return (
     <aside className="flex h-full w-60 shrink-0 flex-col border-r border-line-soft bg-ink-900/80 backdrop-blur-xl">

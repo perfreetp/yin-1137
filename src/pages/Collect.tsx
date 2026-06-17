@@ -40,7 +40,9 @@ export default function Collect() {
     );
   }
 
-  const caseExists = cases.some((c) => c.caseId === selectedCaseId);
+  const caseData = cases.find((c) => c.caseId === selectedCaseId);
+  const showSuccess =
+    !!lastArchiveResult && lastArchiveResult.caseId === selectedCaseId;
 
   return (
     <div className="flex h-full flex-col">
@@ -49,9 +51,9 @@ export default function Collect() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
-        {lastArchiveResult && !caseExists ? (
+        {showSuccess ? (
           <ArchiveSuccess />
-        ) : caseExists ? (
+        ) : caseData ? (
           <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
             <div className="flex flex-col gap-4">
               <PatientCard />

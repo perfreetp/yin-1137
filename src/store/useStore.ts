@@ -78,6 +78,7 @@ interface StoreState {
   archive: () => Promise<boolean>;
   searchArchives: (query: ArchiveQuery) => ArchiveRecord[];
   getSurgeon: (id: string) => Surgeon | undefined;
+  getCaseById: (id: string) => Promise<Case | undefined>;
   clearArchiveResult: () => void;
   fetchArchivedAssets: (caseId: string) => Promise<Asset[]>;
 }
@@ -417,7 +418,9 @@ export const useStore = create<StoreState>((set, get) => ({
     await putItem<Case>("cases", archivedCase);
     set({
       archiveRecords: [record, ...state.archiveRecords],
-      cases: state.cases.filter((c) => c.caseId !== caseData.caseId),
+      cases: state.cases.map((c) =>
+        c.caseId === caseData.caseId ? archivedCase : c,
+      ),
       lastArchiveResult: record,
     });
     return true;
@@ -440,6 +443,12 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   getSurgeon: (id) => get().surgeons.find((s) => s.surgeonId === id),
+
+  getCaseById: async (id) => {
+    const inMemory = get().cases.find((c) => c.caseId === id);
+    if (inMemory) return inMemory;
+    return await getItem<Case>("cases", id);
+  },
 
   clearArchiveResult: () => {
     set({ lastArchiveResult: null });

@@ -19,7 +19,7 @@ export function RoomDeviceSelector() {
   const room = rooms.find((r) => r.roomId === selectedRoomId);
   const deviceType = selectedDevice as DeviceType;
   const matching = cases.filter(
-    (c) => c.roomId === selectedRoomId && c.deviceType === deviceType,
+    (c) => c.roomId === selectedRoomId && c.deviceType === deviceType && !c.archived,
   );
 
   useEffect(() => {
