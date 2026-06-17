@@ -117,13 +117,12 @@ export const useStore = create<StoreState>((set, get) => ({
       getAll<Case>("cases"),
       getAll<ArchiveRecord>("archiveRecords"),
     ]);
-    const active = cases.filter((c) => !c.archived);
     const firstRoom = rooms[0];
     set({
       ready: true,
       rooms,
       surgeons,
-      cases: active,
+      cases,
       archiveRecords: archiveRecords.sort((a, b) =>
         b.archivedAt.localeCompare(a.archivedAt),
       ),
@@ -175,6 +174,13 @@ export const useStore = create<StoreState>((set, get) => ({
         loadingCase: false,
       });
       return;
+    }
+    const inMemory = get().cases.some((c) => c.caseId === caseId);
+    if (!inMemory) {
+      const fromDb = await getItem<Case>("cases", caseId);
+      if (fromDb) {
+        set({ cases: [...get().cases, fromDb] });
+      }
     }
     await get().refreshWorkingData();
     set({ loadingCase: false });

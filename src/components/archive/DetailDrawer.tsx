@@ -97,12 +97,12 @@ export function DetailDrawer({ record, onClose }: DetailDrawerProps) {
       target = await getCaseById(record.caseId);
     }
     if (target) {
-      navigate("/collect");
       const state = useStore.getState();
       state.clearArchiveResult();
       state.selectRoom(target.roomId);
       state.selectDevice(target.deviceType);
-      state.selectCase(target.caseId);
+      await state.selectCase(target.caseId);
+      navigate("/collect");
     }
     onClose();
   };
