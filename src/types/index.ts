@@ -77,10 +77,33 @@ export interface Verification {
   locked: boolean;
 }
 
+export interface ArchiveAssetSnapshot {
+  assetId: string;
+  filename: string;
+  type: AssetType;
+  stage: Stage | null;
+  sizeBytes: number;
+  durationMs?: number;
+  importedAt: string;
+  blobKey: string;
+}
+
+export interface ArchiveCaseSnapshot {
+  patientName: string;
+  hospitalizationNo: string;
+  surgeryName: string;
+  surgeonId: string;
+  department: string;
+  roomId: string;
+  deviceType: string;
+  startTime: string;
+}
+
 export interface ArchiveRecord {
   recordId: string;
   caseId: string;
   traceCode: string;
+  version: number;
   archivedAt: string;
   archivedBy: string;
   assetCount: number;
@@ -95,6 +118,8 @@ export interface ArchiveRecord {
   roomId: string;
   startTime: string;
   snapshot: {
+    caseInfo: ArchiveCaseSnapshot;
+    assets: ArchiveAssetSnapshot[];
     consumables: Consumable[];
     contrast: ContrastAgent | null;
     remarks: Remark[];

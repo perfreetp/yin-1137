@@ -27,7 +27,6 @@ import { useStore } from "@/store/useStore";
 
 interface DetailDrawerProps {
   record: ArchiveRecord;
-  assets: Asset[];
   onClose: () => void;
 }
 
@@ -57,7 +56,7 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   );
 }
 
-export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
+export function DetailDrawer({ record, onClose }: DetailDrawerProps) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("overview");
   const [copied, setCopied] = useState(false);
@@ -69,6 +68,12 @@ export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
   const snap = record.snapshot;
   const covered = new Set(record.stagesCovered);
 
+  const snapshotAssets: Asset[] = snap.assets.map((a) => ({
+    ...a,
+    caseId: record.caseId,
+    placeholder: false,
+  }));
+
   const copyTrace = () => {
     navigator.clipboard?.writeText(record.traceCode).then(() => {
       setCopied(true);
@@ -79,21 +84,7 @@ export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
   const handleDownloadManifest = async (format: "json" | "text") => {
     setDownloading(format);
     try {
-      let caseData = cases.find((c) => c.caseId === record.caseId);
-      if (!caseData) {
-        caseData = await getCaseById(record.caseId);
-      }
-      if (!caseData) return;
-      const manifest = buildManifest({
-        record,
-        caseData,
-        assets,
-        consumables: snap.consumables,
-        contrast: snap.contrast,
-        remarks: snap.remarks,
-        verification: snap.verification,
-        surgeon,
-      });
+      const manifest = buildManifest({ record, surgeon });
       downloadManifest(manifest, format);
     } finally {
       setDownloading(null);
@@ -120,7 +111,7 @@ export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
 
   const assetsByStage: Record<string, Asset[]> = {};
   for (const s of STAGES) assetsByStage[s] = [];
-  for (const a of assets) {
+  for (const a of snapshotAssets) {
     if (a.stage) assetsByStage[a.stage].push(a);
   }
 
@@ -220,10 +211,13 @@ export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
         <div className="min-h-0 flex-1 overflow-auto p-4">
           {tab === "overview" && (
             <div>
-              <Row label="手术名称" value={record.surgeryName} />
+              <Row label="归档版本" value={`V${record.version}`} mono />
+              <Row label="手术名称" value={snap.caseInfo.surgeryName} />
               <Row label="术者" value={`${record.surgeonName}`} />
-              <Row label="科室" value={record.department} />
-              <Row label="手术开始" value={formatDateTime(record.startTime)} mono />
+              <Row label="科室" value={snap.caseInfo.department} />
+              <Row label="患者姓名" value={snap.caseInfo.patientName} />
+              <Row label="住院号" value={snap.caseInfo.hospitalizationNo} mono />
+              <Row label="手术开始" value={formatDateTime(snap.caseInfo.startTime)} mono />
               <Row label="归档时间" value={formatDateTime(record.archivedAt)} mono />
               <Row label="归档操作人" value={record.archivedBy} />
               <Row label="影像数量" value={`${record.assetCount} 项`} mono />
@@ -287,15 +281,15 @@ export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
               </div>
               <div>
                 <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-chalk-mute">
-                  影像资料 ({assets.length})
+                  影像资料 ({snapshotAssets.length})
                 </div>
-                {assets.length === 0 ? (
+                {snapshotAssets.length === 0 ? (
                   <div className="rounded-xs border border-dashed border-line py-6 text-center font-mono text-[11px] text-chalk-mute">
                     该归档记录未保留影像快照
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-2">
-                    {assets.map((a) => (
+                    {snapshotAssets.map((a) => (
                       <div key={a.assetId} className="group">
                         <div className="relative">
                           <AssetThumb asset={a} />
@@ -338,7 +332,7 @@ export function DetailDrawer({ record, assets, onClose }: DetailDrawerProps) {
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
                     <div className="flex justify-between">
                       <span className="text-chalk-mute">影像总数</span>
-                      <span className="font-mono text-chalk">{assets.length} 项</span>
+                      <span className="font-mono text-chalk">{snapshotAssets.length} 项</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-chalk-mute">阶段完整</span>

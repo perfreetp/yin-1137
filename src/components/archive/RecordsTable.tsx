@@ -1,7 +1,7 @@
-import { ChevronRight, FileCheck2 } from "lucide-react";
+import { ChevronRight, FileCheck2, Layers } from "lucide-react";
 import type { ArchiveRecord } from "@/types";
 import { STAGES, STAGE_META } from "@/lib/constants";
-import { formatDateTime, relativeDay } from "@/lib/format";
+import { formatDateTime, formatDuration, relativeDay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface RecordsTableProps {
@@ -22,13 +22,26 @@ export function RecordsTable({ records, onSelect }: RecordsTableProps) {
     );
   }
 
+  const caseVersionCounts = new Map<string, number>();
+  records.forEach((r) => {
+    caseVersionCounts.set(r.caseId, (caseVersionCounts.get(r.caseId) ?? 0) + 1);
+  });
+
+  const firstRecordByCase = new Map<string, string>();
+  const sortedRecords = [...records].sort((a, b) => a.archivedAt.localeCompare(b.archivedAt));
+  for (const r of sortedRecords) {
+    if (!firstRecordByCase.has(r.caseId)) {
+      firstRecordByCase.set(r.caseId, r.archivedAt);
+    }
+  }
+
   return (
     <div className="overflow-hidden rounded-md border border-line-soft">
       <table className="w-full border-collapse text-left">
         <thead>
           <tr className="border-b border-line-soft bg-ink-875">
             <th className="px-3 py-2.5 font-mono text-[10px] uppercase tracking-widest text-chalk-mute">
-              追溯码
+              追溯码 / 版本
             </th>
             <th className="px-3 py-2.5 font-mono text-[10px] uppercase tracking-widest text-chalk-mute">
               患者 / 手术
@@ -51,18 +64,48 @@ export function RecordsTable({ records, onSelect }: RecordsTableProps) {
         <tbody>
           {records.map((r) => {
             const covered = new Set(r.stagesCovered);
+            const hasMultiple = (caseVersionCounts.get(r.caseId) ?? 0) > 1;
+            const firstAt = firstRecordByCase.get(r.caseId);
+            const deltaMs = firstAt && r.version > 1
+              ? new Date(r.archivedAt).getTime() - new Date(firstAt).getTime()
+              : 0;
+
             return (
               <tr
                 key={r.recordId}
                 onClick={() => onSelect(r)}
-                className="group cursor-pointer border-b border-line-soft/60 transition-colors last:border-0 hover:bg-ink-850/70"
+                className={cn(
+                  "group cursor-pointer border-b border-line-soft/60 transition-colors last:border-0 hover:bg-ink-850/70",
+                  hasMultiple && "bg-ink-875/40",
+                )}
               >
                 <td className="px-3 py-3">
-                  <div className="font-mono text-xs font-medium text-teal">
-                    {r.traceCode}
+                  <div className="flex items-center gap-2">
+                    <div className="font-mono text-xs font-medium text-teal">
+                      {r.traceCode}
+                    </div>
+                    <span className={cn(
+                      "rounded-xs px-1.5 py-0.5 font-mono text-[9px]",
+                      r.version === 1
+                        ? "bg-ink-700 text-chalk-dim"
+                        : "bg-violet/15 text-violet ring-1 ring-violet/30",
+                    )}>
+                      V{r.version}
+                    </span>
                   </div>
-                  <div className="font-mono text-[10px] text-chalk-mute">
+                  <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-chalk-mute">
                     {r.hospitalizationNo || "—"}
+                    {hasMultiple && (
+                      <span className="inline-flex items-center gap-0.5 rounded-xs bg-sterile/10 px-1 text-sterile">
+                        <Layers className="h-2.5 w-2.5" />
+                        {caseVersionCounts.get(r.caseId)} 次归档
+                      </span>
+                    )}
+                    {deltaMs > 0 && (
+                      <span className="text-chalk-mute/70">
+                        +{formatDuration(deltaMs)} 补录
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="px-3 py-3">

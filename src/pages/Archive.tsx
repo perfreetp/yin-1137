@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Archive as ArchiveIcon } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { SearchBar } from "@/components/archive/SearchBar";
 import { RecordsTable } from "@/components/archive/RecordsTable";
 import { DetailDrawer } from "@/components/archive/DetailDrawer";
-import type { ArchiveQuery, ArchiveRecord, Asset } from "@/types";
+import type { ArchiveQuery, ArchiveRecord } from "@/types";
 
 const EMPTY_QUERY: ArchiveQuery = {
   dateFrom: "",
@@ -18,30 +18,14 @@ export default function Archive() {
   const ready = useStore((s) => s.ready);
   const archiveRecords = useStore((s) => s.archiveRecords);
   const searchArchives = useStore((s) => s.searchArchives);
-  const fetchArchivedAssets = useStore((s) => s.fetchArchivedAssets);
 
   const [query, setQuery] = useState<ArchiveQuery>(EMPTY_QUERY);
   const [selected, setSelected] = useState<ArchiveRecord | null>(null);
-  const [assets, setAssets] = useState<Asset[]>([]);
 
   const filtered = useMemo(
     () => searchArchives(query),
     [query, archiveRecords, searchArchives],
   );
-
-  useEffect(() => {
-    if (!selected) {
-      setAssets([]);
-      return;
-    }
-    let active = true;
-    void fetchArchivedAssets(selected.caseId).then((a) => {
-      if (active) setAssets(a);
-    });
-    return () => {
-      active = false;
-    };
-  }, [selected, fetchArchivedAssets]);
 
   if (!ready) {
     return (
@@ -75,7 +59,6 @@ export default function Archive() {
       {selected && (
         <DetailDrawer
           record={selected}
-          assets={assets}
           onClose={() => setSelected(null)}
         />
       )}

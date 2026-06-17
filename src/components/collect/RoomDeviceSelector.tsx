@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Clock, User2 } from "lucide-react";
+import { Clock, User2, FileCheck } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { DEVICE_META } from "@/lib/constants";
 import { formatTime } from "@/lib/format";
@@ -22,11 +22,18 @@ export function RoomDeviceSelector() {
     (c) => c.roomId === selectedRoomId && c.deviceType === deviceType && !c.archived,
   );
 
+  const selectedCase = cases.find((c) => c.caseId === selectedCaseId);
+  const selectedMatchesRoomDevice =
+    selectedCase &&
+    selectedCase.roomId === selectedRoomId &&
+    selectedCase.deviceType === deviceType;
+
   useEffect(() => {
+    if (selectedMatchesRoomDevice) return;
     const first = matching[0];
     if (first && first.caseId !== selectedCaseId) {
       void selectCase(first.caseId);
-    } else if (matching.length === 0 && selectedCaseId) {
+    } else if (matching.length === 0 && selectedCaseId && !selectedMatchesRoomDevice) {
       void selectCase(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,9 +95,41 @@ export function RoomDeviceSelector() {
             <span className="font-mono text-[10px] uppercase tracking-widest text-chalk-mute">
               当台病例 ({matching.length})
             </span>
+            {selectedCase?.archived && selectedMatchesRoomDevice && (
+              <span className="flex items-center gap-1 rounded-xs border border-sterile/30 bg-sterile/5 px-1.5 py-0.5 font-mono text-[9px] text-sterile">
+                <FileCheck className="h-2.5 w-2.5" />
+                已定位至历史病例补录
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {matching.length === 0 && (
+            {selectedCase?.archived && selectedMatchesRoomDevice && (
+              <button
+                key={selectedCase.caseId}
+                onClick={() => selectCase(selectedCase.caseId)}
+                className={cn(
+                  "flex items-center gap-2 rounded-xs border px-3 py-1.5 text-left transition-all",
+                  "border-sterile/50 bg-sterile/10 shadow-glow",
+                )}
+              >
+                <FileCheck
+                  className={cn("h-3.5 w-3.5 text-sterile")}
+                />
+                <div className="leading-tight">
+                  <div className="text-xs font-medium text-chalk">
+                    {selectedCase.patientName || "（姓名待补）"}
+                    <span className="ml-1 rounded-xs bg-sterile/20 px-1 font-mono text-[9px] text-sterile">
+                      补录
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 font-mono text-[10px] text-chalk-mute">
+                    <Clock className="h-2.5 w-2.5" />
+                    {formatTime(selectedCase.startTime)}
+                  </div>
+                </div>
+              </button>
+            )}
+            {matching.length === 0 && (!selectedCase?.archived || !selectedMatchesRoomDevice) && (
               <div className="rounded-xs border border-dashed border-line px-3 py-1.5 text-xs text-chalk-mute">
                 该手术间 {DEVICE_META[deviceType].label} 暂无在台病例
               </div>

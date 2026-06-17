@@ -133,15 +133,18 @@ export function buildArchiveRecord(params: {
   verification: Verification | null;
   surgeon?: Surgeon;
   archivedBy: string;
+  existingRecords?: ArchiveRecord[];
 }): ArchiveRecord {
-  const { caseData, assets, consumables, contrast, remarks, verification, surgeon, archivedBy } =
+  const { caseData, assets, consumables, contrast, remarks, verification, surgeon, archivedBy, existingRecords } =
     params;
   const archivedAt = new Date().toISOString();
   const { covered, coverage } = stageCoverage(assets);
+  const version = (existingRecords?.length ?? 0) + 1;
   return {
     recordId: uid("REC"),
     caseId: caseData.caseId,
     traceCode: generateTraceCode(caseData.caseId, archivedAt),
+    version,
     archivedAt,
     archivedBy,
     assetCount: assets.length,
@@ -156,6 +159,26 @@ export function buildArchiveRecord(params: {
     roomId: caseData.roomId,
     startTime: caseData.startTime,
     snapshot: {
+      caseInfo: {
+        patientName: caseData.patientName,
+        hospitalizationNo: caseData.hospitalizationNo,
+        surgeryName: caseData.surgeryName,
+        surgeonId: caseData.surgeonId,
+        department: caseData.department,
+        roomId: caseData.roomId,
+        deviceType: caseData.deviceType,
+        startTime: caseData.startTime,
+      },
+      assets: assets.map((a) => ({
+        assetId: a.assetId,
+        filename: a.filename,
+        type: a.type,
+        stage: a.stage,
+        sizeBytes: a.sizeBytes,
+        durationMs: a.durationMs,
+        importedAt: a.importedAt,
+        blobKey: a.blobKey,
+      })),
       consumables,
       contrast,
       remarks,

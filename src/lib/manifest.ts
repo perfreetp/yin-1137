@@ -74,18 +74,15 @@ export interface ArchiveManifest {
 
 export function buildManifest(params: {
   record: ArchiveRecord;
-  caseData: Case;
-  assets: Asset[];
-  consumables: Consumable[];
-  contrast: ContrastAgent | null;
-  remarks: Remark[];
-  verification: Verification | null;
   surgeon?: Surgeon;
 }): ArchiveManifest {
-  const { record, caseData, assets, consumables, contrast, remarks, verification, surgeon } = params;
+  const { record, surgeon } = params;
+  const snap = record.snapshot;
+  const assets = snap.assets;
+  const caseInfo = snap.caseInfo;
 
-  const stageGroups: Record<Stage, Asset[]> = {} as Record<Stage, Asset[]>;
-  const unassigned: Asset[] = [];
+  const stageGroups: Record<Stage, typeof assets> = {} as Record<Stage, typeof assets>;
+  const unassigned: typeof assets = [];
 
   for (const s of STAGES) stageGroups[s] = [];
   for (const a of assets) {
@@ -118,16 +115,16 @@ export function buildManifest(params: {
     generatedAt: new Date().toISOString(),
     traceCode: record.traceCode,
     archiveRecordId: record.recordId,
-    caseId: caseData.caseId,
+    caseId: record.caseId,
     patient: {
-      name: caseData.patientName,
-      hospitalizationNo: caseData.hospitalizationNo,
-      department: caseData.department,
-      surgeryName: caseData.surgeryName,
+      name: caseInfo.patientName,
+      hospitalizationNo: caseInfo.hospitalizationNo,
+      department: caseInfo.department,
+      surgeryName: caseInfo.surgeryName,
       surgeonName: surgeon?.name ?? record.surgeonName,
-      surgeonId: caseData.surgeonId,
-      roomId: caseData.roomId,
-      startTime: caseData.startTime,
+      surgeonId: caseInfo.surgeonId,
+      roomId: caseInfo.roomId,
+      startTime: caseInfo.startTime,
       archivedAt: record.archivedAt,
       archivedBy: record.archivedBy,
     },
@@ -138,18 +135,18 @@ export function buildManifest(params: {
       type: a.type,
       sizeBytes: a.sizeBytes,
     })),
-    consumables,
-    contrast,
-    remarks,
-    verification: verification
+    consumables: snap.consumables,
+    contrast: snap.contrast,
+    remarks: snap.remarks,
+    verification: snap.verification
       ? {
-          technicianName: verification.technicianName,
-          technicianId: verification.technicianId,
-          technicianAt: verification.technicianAt,
-          nurseName: verification.nurseName,
-          nurseId: verification.nurseId,
-          nurseAt: verification.nurseAt,
-          locked: verification.locked,
+          technicianName: snap.verification.technicianName,
+          technicianId: snap.verification.technicianId,
+          technicianAt: snap.verification.technicianAt,
+          nurseName: snap.verification.nurseName,
+          nurseId: snap.verification.nurseId,
+          nurseAt: snap.verification.nurseAt,
+          locked: snap.verification.locked,
         }
       : null,
     summary: {
@@ -157,8 +154,8 @@ export function buildManifest(params: {
       totalSizeBytes: totalSize,
       stagesCovered: coveredCount,
       stagesTotal: STAGES.length,
-      consumablesCount: consumables.length,
-      remarksCount: remarks.length,
+      consumablesCount: snap.consumables.length,
+      remarksCount: snap.remarks.length,
     },
   };
 }

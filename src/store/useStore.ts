@@ -403,6 +403,9 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ lastValidation: result });
     if (!result.passed) return false;
     const surgeon = state.getSurgeon(caseData.surgeonId);
+    const existingRecords = state.archiveRecords.filter(
+      (r) => r.caseId === state.selectedCaseId,
+    );
     const record = buildArchiveRecord({
       caseData,
       assets: state.assets,
@@ -412,6 +415,7 @@ export const useStore = create<StoreState>((set, get) => ({
       verification: state.verification,
       surgeon,
       archivedBy: CURRENT_USER.technician.name,
+      existingRecords,
     });
     await putItem<ArchiveRecord>("archiveRecords", record);
     const archivedCase = { ...caseData, archived: true };

@@ -19,15 +19,7 @@ export function ArchiveSuccess() {
   const result = useStore((s) => s.lastArchiveResult);
   const clearArchiveResult = useStore((s) => s.clearArchiveResult);
   const cases = useStore((s) => s.cases);
-  const assets = useStore((s) => s.assets);
-  const consumables = useStore((s) => s.consumables);
-  const contrast = useStore((s) => s.contrast);
-  const remarks = useStore((s) => s.remarks);
-  const verification = useStore((s) => s.verification);
-  const selectedCaseId = useStore((s) => s.selectedCaseId);
   const getSurgeon = useStore((s) => s.getSurgeon);
-  const getCaseById = useStore((s) => s.getCaseById);
-  const fetchArchivedAssets = useStore((s) => s.fetchArchivedAssets);
 
   const [downloading, setDownloading] = useState<"json" | "text" | null>(null);
 
@@ -40,36 +32,7 @@ export function ArchiveSuccess() {
     if (!result) return;
     setDownloading(format);
     try {
-      let caseData = cases.find((c) => c.caseId === result.caseId);
-      if (!caseData) {
-        caseData = await getCaseById(result.caseId);
-      }
-      let resolvedAssets = assets;
-      let resolvedConsumables = consumables;
-      let resolvedContrast = contrast;
-      let resolvedRemarks = remarks;
-      let resolvedVerification = verification;
-
-      if (!caseData) return;
-
-      if (selectedCaseId !== caseData.caseId || resolvedAssets.length === 0) {
-        resolvedAssets = await fetchArchivedAssets(caseData.caseId);
-        resolvedConsumables = result.snapshot.consumables;
-        resolvedContrast = result.snapshot.contrast;
-        resolvedRemarks = result.snapshot.remarks;
-        resolvedVerification = result.snapshot.verification;
-      }
-
-      const manifest = buildManifest({
-        record: result,
-        caseData,
-        assets: resolvedAssets,
-        consumables: resolvedConsumables,
-        contrast: resolvedContrast,
-        remarks: resolvedRemarks,
-        verification: resolvedVerification,
-        surgeon,
-      });
+      const manifest = buildManifest({ record: result, surgeon });
       downloadManifest(manifest, format);
     } finally {
       setDownloading(null);

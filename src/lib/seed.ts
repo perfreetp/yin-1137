@@ -1,4 +1,5 @@
 import type {
+  ArchiveAssetSnapshot,
   ArchiveRecord,
   Asset,
   Case,
@@ -377,33 +378,154 @@ const ARCHIVE_DEFS: SeedArchiveDef[] = [
   },
 ];
 
-export const SEED_ARCHIVE_RECORDS: ArchiveRecord[] = ARCHIVE_DEFS.map((d) => {
-  const archivedAt = daysAgo(d.daysAgoVal, d.hour + 1, 30);
-  return {
-    recordId: uid("REC"),
-    caseId: d.caseId,
-    traceCode: generateTraceCode(d.caseId, archivedAt),
-    archivedAt,
-    archivedBy: CURRENT_USER.technician.name,
-    assetCount: d.assetCount,
-    stageCoverage: `${d.stagesCovered.length}/5`,
-    stagesCovered: d.stagesCovered as ArchiveRecord["stagesCovered"],
-    patientName: d.patientName,
-    hospitalizationNo: d.hospitalizationNo,
-    surgeryName: d.surgeryName,
-    surgeonId: d.surgeonId,
-    surgeonName: d.surgeonName,
-    department: d.department,
-    roomId: d.roomId,
-    startTime: daysAgo(d.daysAgoVal, d.hour, 0),
-    snapshot: {
-      consumables: [],
-      contrast: null,
-      remarks: [],
-      verification: null,
+function buildAssetsSnapshot(
+  caseId: string,
+  count: number,
+  stages: string[],
+  startIndex: number,
+): ArchiveAssetSnapshot[] {
+  const result: ArchiveAssetSnapshot[] = [];
+  const types: Array<ArchiveAssetSnapshot["type"]> = ["image", "image", "sequence", "video"];
+  for (let i = 0; i < count; i++) {
+    const type = types[(i + startIndex) % types.length];
+    const stage = stages[i % stages.length];
+    const id = `A-${1000 + startIndex + i}`;
+    result.push({
+      assetId: id,
+      filename:
+        stage === "术前"
+          ? `preop_view_${String(i + 1).padStart(3, "0")}.jpg`
+          : stage === "穿刺"
+            ? `puncture_${String(i + 1).padStart(3, "0")}.jpg`
+            : stage === "造影"
+              ? `angio_run_${String(i + 1).padStart(3, "0")}.dcm`
+              : stage === "支架释放"
+                ? `stent_deploy_${String(i + 1).padStart(3, "0")}.mp4`
+                : `postop_check_${String(i + 1).padStart(3, "0")}.jpg`,
+      type,
+      stage: stage as ArchiveAssetSnapshot["stage"],
+      sizeBytes: 500_000 + ((i * 131) % 20) * 400_000,
+      durationMs: type === "video" || type === "sequence" ? 4000 + (i % 6) * 2000 : undefined,
+      importedAt: new Date().toISOString(),
+      blobKey: "",
+    });
+  }
+  return result;
+}
+
+export const SEED_ARCHIVE_RECORDS: ArchiveRecord[] = (() => {
+  const results: ArchiveRecord[] = [];
+  const caseVersionIndex: Record<string, number> = {};
+
+  const extras: {
+    caseId: string;
+    extraVersion: number;
+    assetDelta: number;
+    stagesExtra: string[];
+    daysOffset: number;
+  }[] = [
+    {
+      caseId: "C-2026061001",
+      extraVersion: 2,
+      assetDelta: 6,
+      stagesExtra: ["术前", "造影", "支架释放", "术后复查"],
+      daysOffset: 1,
     },
-  };
-});
+  ];
+
+  for (const d of ARCHIVE_DEFS) {
+    caseVersionIndex[d.caseId] = (caseVersionIndex[d.caseId] ?? 0) + 1;
+    const version = caseVersionIndex[d.caseId];
+    const archivedAt = daysAgo(d.daysAgoVal, d.hour + 1, 30);
+    const assets = buildAssetsSnapshot(d.caseId, d.assetCount, d.stagesCovered, version * 37);
+    results.push({
+      recordId: uid("REC"),
+      caseId: d.caseId,
+      version,
+      traceCode: generateTraceCode(d.caseId, archivedAt),
+      archivedAt,
+      archivedBy: CURRENT_USER.technician.name,
+      assetCount: d.assetCount,
+      stageCoverage: `${d.stagesCovered.length}/5`,
+      stagesCovered: d.stagesCovered as ArchiveRecord["stagesCovered"],
+      patientName: d.patientName,
+      hospitalizationNo: d.hospitalizationNo,
+      surgeryName: d.surgeryName,
+      surgeonId: d.surgeonId,
+      surgeonName: d.surgeonName,
+      department: d.department,
+      roomId: d.roomId,
+      startTime: daysAgo(d.daysAgoVal, d.hour, 0),
+      snapshot: {
+        caseInfo: {
+          patientName: d.patientName,
+          hospitalizationNo: d.hospitalizationNo,
+          surgeryName: d.surgeryName,
+          surgeonId: d.surgeonId,
+          department: d.department,
+          roomId: d.roomId,
+          deviceType: "DSA",
+          startTime: daysAgo(d.daysAgoVal, d.hour, 0),
+        },
+        assets,
+        consumables: [],
+        contrast: null,
+        remarks: [],
+        verification: null,
+      },
+    });
+
+    const extra = extras.find((e) => e.caseId === d.caseId);
+    if (extra) {
+      caseVersionIndex[d.caseId] = (caseVersionIndex[d.caseId] ?? 0) + 1;
+      const v2 = caseVersionIndex[d.caseId];
+      const v2AssetCount = d.assetCount + extra.assetDelta;
+      const v2Stages = Array.from(
+        new Set([...(d.stagesCovered as string[]), ...extra.stagesExtra]),
+      );
+      const v2At = daysAgo(d.daysAgoVal - extra.daysOffset, d.hour + 2, 5);
+      const v2Assets = buildAssetsSnapshot(d.caseId, v2AssetCount, v2Stages, 200 + v2 * 11);
+      results.push({
+        recordId: uid("REC"),
+        caseId: d.caseId,
+        version: v2,
+        traceCode: generateTraceCode(d.caseId, v2At),
+        archivedAt: v2At,
+        archivedBy: CURRENT_USER.technician.name,
+        assetCount: v2AssetCount,
+        stageCoverage: `${v2Stages.length}/5`,
+        stagesCovered: v2Stages as ArchiveRecord["stagesCovered"],
+        patientName: d.patientName,
+        hospitalizationNo: d.hospitalizationNo,
+        surgeryName: d.surgeryName,
+        surgeonId: d.surgeonId,
+        surgeonName: d.surgeonName,
+        department: d.department,
+        roomId: d.roomId,
+        startTime: daysAgo(d.daysAgoVal, d.hour, 0),
+        snapshot: {
+          caseInfo: {
+            patientName: d.patientName,
+            hospitalizationNo: d.hospitalizationNo,
+            surgeryName: d.surgeryName,
+            surgeonId: d.surgeonId,
+            department: d.department,
+            roomId: d.roomId,
+            deviceType: "DSA",
+            startTime: daysAgo(d.daysAgoVal, d.hour, 0),
+          },
+          assets: v2Assets,
+          consumables: [],
+          contrast: null,
+          remarks: [],
+          verification: null,
+        },
+      });
+    }
+  }
+
+  return results;
+})();
 
 export async function isSeeded(): Promise<boolean> {
   const { getAll } = await import("@/lib/db");
