@@ -30,7 +30,9 @@ import { isSeeded, seedDatabase } from "@/lib/seed";
 import { buildArchiveRecord, runValidation } from "@/lib/archive";
 import { CURRENT_USER, DEPARTMENTS, STAGES } from "@/lib/constants";
 import { uid } from "@/lib/format";
+import { suggestStage } from "@/lib/stageSuggest";
 import { clearThumbs, setThumb } from "@/lib/thumbnails";
+import { loadAllBlobsThumbnails } from "@/lib/blobUtils";
 
 interface StoreState {
   ready: boolean;
@@ -50,7 +52,7 @@ interface StoreState {
   verification: Verification | null;
 
   lastValidation: ValidationResult | null;
-  lastArchiveResult: { traceCode: string; recordId: string } | null;
+  lastArchiveResult: ArchiveRecord | null;
   loadingCase: boolean;
 
   init: () => Promise<void>;
@@ -60,7 +62,7 @@ interface StoreState {
   selectCase: (caseId: string | null) => Promise<void>;
   refreshWorkingData: () => Promise<void>;
   updateCaseField: (field: keyof Case, value: string) => Promise<void>;
-  importAssets: (files: File[], type: AssetType) => Promise<void>;
+  importAssets: (files: File[], type: AssetType | "auto") => Promise<void>;
   setAssetStage: (assetId: string, stage: Stage | null) => Promise<void>;
   deleteAsset: (assetId: string) => Promise<void>;
   addConsumable: () => Promise<void>;
@@ -81,15 +83,7 @@ interface StoreState {
 }
 
 async function loadBlobsThumbnails(assets: Asset[]) {
-  const db = await getDB();
-  await Promise.all(
-    assets.map(async (a) => {
-      if (!a.placeholder && a.blobKey && !a.blobKey.startsWith("seed-")) {
-        const blob = await db.get("blobs", a.blobKey);
-        if (blob) setThumb(a.assetId, URL.createObjectURL(blob));
-      }
-    }),
-  );
+  await loadAllBlobsThumbnails(assets);
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -223,19 +217,26 @@ export const useStore = create<StoreState>((set, get) => ({
     const caseId = get().selectedCaseId;
     if (!caseId) return;
     const db = await getDB();
+    const device = get().selectedDevice;
     const newAssets: Asset[] = [];
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       const assetId = uid("A");
       let resolvedType = type;
       let placeholder = true;
       let blobKey = "";
       let durationMs: number | undefined;
-      if (type === "image") {
-        await db.put("blobs", file, assetId);
+      if (!resolvedType || resolvedType === "auto") {
+        if (file.type.startsWith("image/")) resolvedType = "image";
+        else if (file.type.startsWith("video/")) resolvedType = "video";
+        else resolvedType = "sequence";
+      }
+      await db.put("blobs", file, assetId);
+      blobKey = assetId;
+      placeholder = false;
+      if (resolvedType === "image") {
         setThumb(assetId, URL.createObjectURL(file));
-        placeholder = false;
-        blobKey = assetId;
-      } else if (type === "video") {
+      } else if (resolvedType === "video") {
         durationMs = await new Promise<number>((resolve) => {
           const v = document.createElement("video");
           v.preload = "metadata";
@@ -244,11 +245,13 @@ export const useStore = create<StoreState>((set, get) => ({
           v.src = URL.createObjectURL(file);
         });
       }
+      const suggestedStage = suggestStage(file.name, resolvedType, device, i, files.length);
       const asset: Asset = {
         assetId,
         caseId,
         type: resolvedType,
-        stage: null,
+        stage: suggestedStage,
+        stageSuggested: suggestedStage !== null,
         filename: file.name,
         sizeBytes: file.size,
         durationMs,
@@ -266,7 +269,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const assets = get().assets;
     const target = assets.find((a) => a.assetId === assetId);
     if (!target) return;
-    const updated = { ...target, stage };
+    const updated = { ...target, stage, stageSuggested: false };
     await putItem<Asset>("assets", updated);
     set({
       assets: assets.map((a) => (a.assetId === assetId ? updated : a)),
@@ -415,7 +418,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set({
       archiveRecords: [record, ...state.archiveRecords],
       cases: state.cases.filter((c) => c.caseId !== caseData.caseId),
-      lastArchiveResult: { traceCode: record.traceCode, recordId: record.recordId },
+      lastArchiveResult: record,
     });
     return true;
   },

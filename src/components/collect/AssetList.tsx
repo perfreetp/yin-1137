@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Download, Trash2, Sparkles } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { AssetThumb } from "@/components/AssetThumb";
 import { StageChip } from "@/components/ui/StageChip";
@@ -6,6 +6,7 @@ import { StageSelect } from "@/components/ui/StageSelect";
 import { STAGES, STAGE_META } from "@/lib/constants";
 import { formatBytes, formatDuration, stageCoverage } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { downloadAssetBlob } from "@/lib/blobUtils";
 
 export function AssetList() {
   const assets = useStore((s) => s.assets);
@@ -69,8 +70,19 @@ export function AssetList() {
             >
               <AssetThumb asset={a} className="h-12 w-12 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="truncate font-mono text-xs text-chalk">
-                  {a.filename}
+                <div className="flex items-center gap-1.5">
+                  {a.stageSuggested && a.stage && (
+                    <span
+                      className="flex items-center gap-0.5 rounded-xs bg-sterile/15 px-1 py-0.5 text-[9px] font-medium text-sterile"
+                      title="系统建议阶段，可调整"
+                    >
+                      <Sparkles className="h-2.5 w-2.5" />
+                      建议
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1 truncate font-mono text-xs text-chalk">
+                    {a.filename}
+                  </div>
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-chalk-mute">
                   <span className="rounded-xs bg-ink-800 px-1.5 py-0.5">
@@ -95,6 +107,13 @@ export function AssetList() {
                   onChange={(stage) => setAssetStage(a.assetId, stage)}
                 />
               </div>
+              <button
+                onClick={() => downloadAssetBlob(a)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xs text-chalk-mute opacity-0 transition-all hover:bg-ink-800 hover:text-chalk group-hover:opacity-100"
+                title="下载原文件"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
               <button
                 onClick={() => deleteAsset(a.assetId)}
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xs text-chalk-mute opacity-0 transition-all hover:bg-bad/10 hover:text-bad group-hover:opacity-100"

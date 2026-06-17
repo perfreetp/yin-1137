@@ -1,9 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, FileCheck2, FolderSearch } from "lucide-react";
+import {
+  CheckCircle2,
+  FileCheck2,
+  FolderSearch,
+  FileJson,
+  FileText,
+} from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/format";
 import { CURRENT_USER } from "@/lib/constants";
+import { buildManifest, downloadManifest } from "@/lib/manifest";
 
 export function ArchiveSuccess() {
   const navigate = useNavigate();
@@ -11,11 +18,34 @@ export function ArchiveSuccess() {
   const cases = useStore((s) => s.cases);
   const clearArchiveResult = useStore((s) => s.clearArchiveResult);
   const assets = useStore((s) => s.assets);
+  const consumables = useStore((s) => s.consumables);
+  const contrast = useStore((s) => s.contrast);
+  const remarks = useStore((s) => s.remarks);
+  const verification = useStore((s) => s.verification);
+  const selectedCaseId = useStore((s) => s.selectedCaseId);
+  const getSurgeon = useStore((s) => s.getSurgeon);
   const computeValidation = useStore((s) => s.computeValidation);
 
   if (!result) return null;
   const validation = computeValidation();
-  const caseData = cases.length; // just to know if cases remain
+  const caseData = cases.find((c) => c.caseId === selectedCaseId);
+  const caseCount = cases.filter((c) => !c.archived).length;
+  const surgeon = caseData ? getSurgeon(caseData.surgeonId) : undefined;
+
+  const handleDownload = (format: "json" | "text") => {
+    if (!result || !caseData) return;
+    const manifest = buildManifest({
+      record: result,
+      caseData,
+      assets,
+      consumables,
+      contrast,
+      remarks,
+      verification,
+      surgeon,
+    });
+    downloadManifest(manifest, format);
+  };
 
   return (
     <div className="flex h-full items-center justify-center p-6">
@@ -61,7 +91,34 @@ export function ArchiveSuccess() {
             </div>
           </div>
 
-          <div className="mt-2 flex items-center justify-center gap-1.5 font-mono text-[10px] text-chalk-mute">
+          <div className="mt-4">
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-chalk-mute">
+              归档包清单
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<FileText className="h-3.5 w-3.5" />}
+                onClick={() => handleDownload("text")}
+              >
+                下载 TXT
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<FileJson className="h-3.5 w-3.5" />}
+                onClick={() => handleDownload("json")}
+              >
+                下载 JSON
+              </Button>
+            </div>
+            <p className="mt-2 font-mono text-[10px] text-chalk-mute">
+              清单含追溯码、患者信息、阶段影像、耗材、造影剂与备注，可交病案室复核
+            </p>
+          </div>
+
+          <div className="mt-3 flex items-center justify-center gap-1.5 font-mono text-[10px] text-chalk-mute">
             <FileCheck2 className="h-3 w-3" />
             归档时间 {formatDateTime(new Date().toISOString())}
           </div>
@@ -84,7 +141,7 @@ export function ArchiveSuccess() {
             归档下一例
           </Button>
         </div>
-        {caseData === 0 && (
+        {caseCount === 0 && (
           <div className="px-4 pb-4 text-center font-mono text-[10px] text-chalk-mute">
             当日全部病例已归档完成
           </div>

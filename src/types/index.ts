@@ -40,6 +40,7 @@ export interface Asset {
   importedAt: string;
   blobKey: string;
   placeholder: boolean;
+  stageSuggested?: boolean;
 }
 
 export interface Consumable {

@@ -15,12 +15,6 @@ const IMPORT_OPTIONS: {
   { type: "sequence", label: "导入造影序列", icon: Layers, accept: ".dcm,.dicom" },
 ];
 
-function inferType(file: File): AssetType {
-  if (file.type.startsWith("image/")) return "image";
-  if (file.type.startsWith("video/")) return "video";
-  return "sequence";
-}
-
 export function ImportZone() {
   const importAssets = useStore((s) => s.importAssets);
   const selectedCaseId = useStore((s) => s.selectedCaseId);
@@ -31,7 +25,7 @@ export function ImportZone() {
   const handleFiles = (files: FileList | null, type?: AssetType) => {
     if (!files || !files.length || !selectedCaseId) return;
     const arr = Array.from(files);
-    const resolvedType = type ?? inferType(arr[0]);
+    const resolvedType: AssetType | "auto" = type ?? "auto";
     void importAssets(arr, resolvedType);
   };
 
